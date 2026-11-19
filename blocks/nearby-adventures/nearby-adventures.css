@@ -96,7 +96,7 @@
 
 @media (width >= 900px) {
   .nearby-adventures .nearby-adventures-layer {
-    grid-template-columns: 180px 1fr 180px;
+    grid-template-columns: 180px 1fr 220px;
   }
 
   .nearby-adventures .nearby-adventures-layer .details {

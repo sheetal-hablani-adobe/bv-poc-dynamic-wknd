@@ -85,10 +85,11 @@ export default async function decorate(block) {
       const age = resp.headers.get('age');
       const outer = data.outer || { generatedAt: data.generatedAt, pop: data.pop };
       const inner = data.inner || { fetchMs: data.indexFetchMs };
-      const outerHit = xCache === 'HIT';
+      const outerHit = host.name === 'sandbox' && xCache === 'HIT'; // only the publish CDN caches
       const innerHit = typeof inner.fetchMs === 'number' && inner.fetchMs < 20;
 
-      heading.textContent = data.city ? `Adventures near ${data.city}` : 'Adventures near you';
+      const city = (data.city || '').replace(/\b\w/g, (c) => c.toUpperCase()); // geolocation gives lower case
+      heading.textContent = city ? `Adventures near ${city}` : 'Adventures near you';
       renderCards(list, data.adventures || []);
       layers.textContent = '';
       layers.append(
