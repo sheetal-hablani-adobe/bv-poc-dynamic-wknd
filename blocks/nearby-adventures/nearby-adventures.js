@@ -1,6 +1,7 @@
 // "Adventures near you" – caching demo for the AEM Edge Function /api/nearby
-// The reply shows when it was generated and where, so the audience can see the CDN cache:
-// same "generated at" + growing age = served from the CDN cache, without running the function.
+// Shows both cache layers:
+//   OUTER – CDN cache: stores the function's reply (x-cache / age headers, generated time)
+//   INNER – fetch cache: stores what the function fetched from the origin (query-index.json)
 
 const EDGE_HOSTS = {
   sandbox: 'https://publish-p233852-e2376453.adobeaemcloud.com', // publish CDN: cdn.yaml rules + CDN cache
@@ -23,6 +24,12 @@ function el(tag, className, text) {
   return node;
 }
 
+const time = (value) => (value ? new Date(value).toLocaleTimeString() : '–');
+const secondsSince = (value) => {
+  if (!value) return 0;
+  return Math.max(0, Math.round((Date.now() - Date.parse(value)) / 1000));
+};
+
 function renderCards(list, adventures) {
   list.textContent = '';
   adventures.forEach((a) => {
@@ -42,6 +49,12 @@ function renderCards(list, adventures) {
   });
 }
 
+function layerRow(name, stores, status, details, hit) {
+  const row = el('div', `nearby-adventures-layer ${hit ? 'hit' : 'miss'}`);
+  row.append(el('strong', '', name), el('span', 'stores', stores), el('span', 'status', status), el('span', 'details', details));
+  return row;
+}
+
 /**
  * loads and decorates the block
  * @param {Element} block The block element
@@ -51,6 +64,7 @@ export default async function decorate(block) {
   block.textContent = '';
   const heading = el('h3', '', 'Adventures near you');
   const list = el('ul', 'nearby-adventures-list');
+  const layers = el('div', 'nearby-adventures-layers');
   const meta = el('p', 'nearby-adventures-meta');
   const refresh = el('button', 'button primary', 'Refresh');
   refresh.type = 'button';
@@ -67,11 +81,33 @@ export default async function decorate(block) {
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       const ms = Math.round(performance.now() - started);
-      const ageSec = Math.max(0, Math.round((Date.now() - Date.parse(data.generatedAt)) / 1000));
+      const xCache = (resp.headers.get('x-cache') || '').split(',').pop().trim(); // last hop = closest to you
+      const age = resp.headers.get('age');
+      const outer = data.outer || { generatedAt: data.generatedAt, pop: data.pop };
+      const inner = data.inner || { fetchMs: data.indexFetchMs };
+      const outerHit = xCache === 'HIT';
+      const innerHit = typeof inner.fetchMs === 'number' && inner.fetchMs < 20;
+
       heading.textContent = data.city ? `Adventures near ${data.city}` : 'Adventures near you';
       renderCards(list, data.adventures || []);
-      meta.textContent = `Answered in ${ms} ms · generated ${new Date(data.generatedAt).toLocaleTimeString()} `
-        + `(${ageSec} s ago) at CDN location ${data.pop} · query-index fetch ${data.indexFetchMs} ms · via ${host.name}`;
+      layers.textContent = '';
+      layers.append(
+        layerRow(
+          'Outer – CDN cache',
+          'stores the function\'s reply (this JSON, per visitor)',
+          host.name === 'sandbox' ? `${xCache || 'no header'}${age ? ` · age ${age} s` : ''}` : 'skipped (debug / local)',
+          `reply generated ${time(outer.generatedAt)} (${secondsSince(outer.generatedAt)} s ago) at ${outer.pop || '–'}`,
+          outerHit,
+        ),
+        layerRow(
+          'Inner – fetch cache',
+          `stores what the function fetched: ${inner.stores || 'query-index.json'}${inner.pages ? ` (${inner.pages} pages, ${Math.round((inner.bytes || 0) / 1024)} KB)` : ''}`,
+          `${innerHit ? 'HIT' : 'MISS'} · fetch ${inner.fetchMs} ms`,
+          `copy fetched from the origin ${time(inner.fetchedFromOrigin)}${inner.fetchedFromOrigin ? ` (${secondsSince(inner.fetchedFromOrigin)} s ago)` : ''}`,
+          innerHit,
+        ),
+      );
+      meta.textContent = `Answered in ${ms} ms via ${host.name}${outerHit ? ' – the function did not run' : ''}`;
     } catch (e) {
       block.classList.add('error');
       meta.textContent = `Could not reach the edge function (${e.message}). Try ?edge=debug.`;
@@ -79,6 +115,6 @@ export default async function decorate(block) {
   }
 
   refresh.addEventListener('click', load);
-  block.append(heading, list, meta, refresh);
+  block.append(heading, list, layers, meta, refresh);
   load();
 }

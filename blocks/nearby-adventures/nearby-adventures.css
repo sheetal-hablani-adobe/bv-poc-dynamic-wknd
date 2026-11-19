@@ -44,6 +44,40 @@
   color: #666;
 }
 
+.nearby-adventures .nearby-adventures-layers {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.nearby-adventures .nearby-adventures-layer {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 2px 16px;
+  padding: 10px 14px;
+  border-left: 4px solid #999;
+  background: #fff;
+  font-size: var(--body-font-size-xs, 14px);
+}
+
+.nearby-adventures .nearby-adventures-layer.hit {
+  border-left-color: #2d9d78;
+}
+
+.nearby-adventures .nearby-adventures-layer.miss {
+  border-left-color: #e68619;
+}
+
+.nearby-adventures .nearby-adventures-layer .status {
+  font-family: monospace;
+  font-weight: 600;
+}
+
+.nearby-adventures .nearby-adventures-layer .stores,
+.nearby-adventures .nearby-adventures-layer .details {
+  color: #555;
+}
+
 .nearby-adventures .nearby-adventures-meta {
   font-family: monospace;
   font-size: 13px;
@@ -57,5 +91,15 @@
 @media (width >= 600px) {
   .nearby-adventures .nearby-adventures-list {
     grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (width >= 900px) {
+  .nearby-adventures .nearby-adventures-layer {
+    grid-template-columns: 180px 1fr 180px;
+  }
+
+  .nearby-adventures .nearby-adventures-layer .details {
+    grid-column: 2 / 4;
   }
 }
